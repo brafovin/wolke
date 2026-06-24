@@ -3,730 +3,473 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Ausweich & Sammel Spiel</title>
+  <title>3D Abenteuer</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #000; overflow: hidden; }
+    canvas { display: block; }
 
-    body {
-      background: #0a0a1a;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      min-height: 100vh;
-      font-family: 'Segoe UI', sans-serif;
-      color: #fff;
-      overflow: hidden;
-    }
-
-    #hud {
-      display: flex;
-      gap: 28px;
-      margin-bottom: 10px;
-      font-size: 17px;
-      font-weight: bold;
-    }
-    #hud span { color: #aef; }
-    #collected-hud { color: #ffd700; }
-
-    #canvas {
-      border: 2px solid #334;
-      border-radius: 8px;
-      background: #0d0d2b;
-      display: block;
-    }
-
-    /* ── Overlays ── */
-    .screen {
+    #ui {
       position: absolute;
-      display: none;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 16px;
-      text-align: center;
-      padding: 20px;
+      top: 0; left: 0; right: 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      padding: 14px 18px;
+      pointer-events: none;
     }
-    .screen.active { display: flex; }
-
-    .screen h1 { font-size: 42px; color: #7af; letter-spacing: 2px; }
-    .screen h2 { font-size: 24px; color: #cde; margin-bottom: 4px; }
-    .screen p  { font-size: 14px; color: #99b; max-width: 360px; line-height: 1.6; }
-
-    .btn {
-      padding: 12px 36px;
-      font-size: 18px;
-      background: #3a6fff;
+    #title {
       color: #fff;
-      border: none;
-      border-radius: 8px;
-      cursor: pointer;
-      transition: background 0.2s, transform 0.1s;
+      font-family: 'Segoe UI', sans-serif;
+      font-size: 22px;
+      font-weight: bold;
+      text-shadow: 0 2px 8px rgba(0,0,0,0.9);
     }
-    .btn:hover  { background: #5a8fff; }
-    .btn:active { transform: scale(0.96); }
-
-    .score-display { font-size: 26px; color: #fa0; }
-
-    /* ── Character picker ── */
-    .char-section { width: 100%; max-width: 400px; }
-    .char-section h3 { font-size: 14px; color: #88a; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px; }
-
-    .char-grid {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      justify-content: center;
-      margin-bottom: 14px;
+    #score {
+      color: #ffd700;
+      font-family: 'Segoe UI', sans-serif;
+      font-size: 20px;
+      font-weight: bold;
+      text-shadow: 0 2px 8px rgba(0,0,0,0.9);
     }
-
-    .char-card {
-      font-size: 36px;
-      width: 62px;
-      height: 62px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      border-radius: 10px;
-      border: 2px solid #334;
-      background: #11152a;
-      cursor: pointer;
-      transition: border-color 0.15s, transform 0.1s, background 0.15s;
-      position: relative;
+    #controls-hint {
+      position: absolute;
+      bottom: 12px;
+      left: 50%;
+      transform: translateX(-50%);
+      color: rgba(255,255,255,0.75);
+      font-family: 'Segoe UI', sans-serif;
+      font-size: 13px;
+      text-shadow: 0 1px 6px rgba(0,0,0,0.9);
+      pointer-events: none;
+      white-space: nowrap;
+      background: rgba(0,0,0,0.3);
+      padding: 5px 14px;
+      border-radius: 20px;
     }
-    .char-card span.label {
-      font-size: 9px;
-      color: #778;
-      margin-top: 2px;
-      line-height: 1;
-    }
-    .char-card:hover  { border-color: #558; background: #1a1f3a; transform: scale(1.06); }
-    .char-card.selected {
-      border-color: #3a6fff;
-      background: #1a2a5a;
-      box-shadow: 0 0 10px #3a6fff88;
+    #fallen-msg {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      color: #ff6b6b;
+      font-family: 'Segoe UI', sans-serif;
+      font-size: 28px;
+      font-weight: bold;
+      text-shadow: 0 0 20px #ff0000;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.2s;
     }
   </style>
 </head>
 <body>
 
-<div id="hud">
-  <div>Punkte: <span id="score">0</span></div>
-  <div>Level: <span id="level">1</span></div>
-  <div>Leben: <span id="lives">❤️❤️❤️</span></div>
-  <div id="collected-hud">⭐ <span id="collected">0</span></div>
+<div id="ui">
+  <div id="title">🏃 3D Abenteuer</div>
+  <div id="score">⭐ 0 / 10</div>
 </div>
-
-<canvas id="canvas" width="480" height="580"></canvas>
-
-<!-- START SCREEN -->
-<div id="screen-start" class="screen active">
-  <h1>⚡ AUSWEICHEN ⚡</h1>
-  <p>Weiche den Gefahren aus 💣🪨🔥<br>
-     Sammel Boni ein ⭐💎🍀 und Herzen ❤️ für Extra-Leben!<br>
-     <strong>← →</strong> bewegen &nbsp;|&nbsp; <strong>Leertaste / ↑</strong> springen</p>
-  <button class="btn" id="btn-to-char">Charakter wählen →</button>
+<div id="controls-hint">
+  W/S: Vor/Zurück &nbsp;|&nbsp; A/D: Drehen &nbsp;|&nbsp; Leertaste: Springen &nbsp;|&nbsp; Maus ziehen: Kamera
 </div>
+<div id="fallen-msg">Heruntergefallen! 💀</div>
 
-<!-- CHARACTER SELECT SCREEN -->
-<div id="screen-char" class="screen">
-  <h2>Wähle deinen Charakter</h2>
-
-  <div class="char-section">
-    <h3>👨 Menschen</h3>
-    <div class="char-grid" id="grid-humans"></div>
-  </div>
-
-  <div class="char-section">
-    <h3>🐾 Tiere</h3>
-    <div class="char-grid" id="grid-animals"></div>
-  </div>
-
-  <button class="btn" id="btn-start">Spielen ▶</button>
-</div>
-
-<!-- GAME OVER SCREEN -->
-<div id="screen-gameover" class="screen">
-  <h1>💀 Game Over</h1>
-  <div class="score-display" id="final-score"></div>
-  <p id="final-msg"></p>
-  <button class="btn" id="btn-replay">Nochmal spielen</button>
-  <button class="btn" id="btn-charselect" style="background:#334; font-size:14px; padding:8px 20px;">Charakter wechseln</button>
-</div>
-
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
-// ── Characters ────────────────────────────────────────────────────────────────
+// ── Scene ─────────────────────────────────────────────────────────────────────
 
-const HUMANS = [
-  { emoji: '👨', label: 'Mann',         bodyColor: '#3a6fff' },
-  { emoji: '👩', label: 'Frau',         bodyColor: '#e040fb' },
-  { emoji: '👦', label: 'Junge',        bodyColor: '#00bcd4' },
-  { emoji: '👧', label: 'Mädchen',      bodyColor: '#f06292' },
-  { emoji: '🧙', label: 'Zauberer',     bodyColor: '#7c4dff' },
-  { emoji: '🦸', label: 'Held',         bodyColor: '#e53935' },
-  { emoji: '🧜', label: 'Nixe',         bodyColor: '#00897b' },
-  { emoji: '🤴', label: 'Prinz',        bodyColor: '#ffc107' },
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x87ceeb);
+scene.fog = new THREE.FogExp2(0x87ceeb, 0.022);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+document.body.appendChild(renderer.domElement);
+
+const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 200);
+camera.position.set(0, 6, 10);
+
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+// ── Lighting ──────────────────────────────────────────────────────────────────
+
+scene.add(new THREE.AmbientLight(0xffffff, 0.55));
+
+const sun = new THREE.DirectionalLight(0xfff5d0, 1.3);
+sun.position.set(18, 30, 12);
+sun.castShadow = true;
+sun.shadow.mapSize.setScalar(2048);
+sun.shadow.camera.near = 1;
+sun.shadow.camera.far = 100;
+sun.shadow.camera.left = sun.shadow.camera.bottom = -35;
+sun.shadow.camera.right = sun.shadow.camera.top = 35;
+scene.add(sun);
+
+// Sun sphere (visual only)
+const sunSphere = new THREE.Mesh(
+  new THREE.SphereGeometry(2.5, 16, 16),
+  new THREE.MeshBasicMaterial({ color: 0xfff176 })
+);
+sunSphere.position.set(40, 50, -30);
+scene.add(sunSphere);
+
+// ── Ground ────────────────────────────────────────────────────────────────────
+
+const ground = new THREE.Mesh(
+  new THREE.PlaneGeometry(100, 100),
+  new THREE.MeshLambertMaterial({ color: 0x4caf50 })
+);
+ground.rotation.x = -Math.PI / 2;
+ground.receiveShadow = true;
+scene.add(ground);
+
+const grid = new THREE.GridHelper(100, 50, 0x388e3c, 0x388e3c);
+grid.position.y = 0.01;
+scene.add(grid);
+
+// ── Platforms ─────────────────────────────────────────────────────────────────
+
+const platColors = [0x8d6e63, 0x7986cb, 0xe57373, 0x81c784, 0xffb74d];
+const platforms = [];
+
+function addPlatform(cx, baseY, cz, w, d, h, colorIdx) {
+  const mat = new THREE.MeshLambertMaterial({ color: platColors[colorIdx % platColors.length] });
+  const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+  mesh.position.set(cx, baseY + h / 2, cz);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  scene.add(mesh);
+  platforms.push({ cx, cz, top: baseY + h, halfW: w / 2, halfD: d / 2 });
+}
+
+addPlatform( 6,  0.6, -5,  4, 4, 1.2, 0);
+addPlatform(11,  1.4, -9,  3, 3, 1.0, 1);
+addPlatform(16,  2.4, -6,  4, 4, 1.2, 2);
+addPlatform( 2,  1.0,-12,  3, 3, 1.0, 3);
+addPlatform(-5,  0.6, -8,  4, 4, 1.2, 4);
+addPlatform(-10, 1.6, -4,  3, 3, 1.0, 0);
+addPlatform(-14, 2.6, -9,  4, 4, 1.2, 1);
+addPlatform( 0,  3.2,-18,  6, 6, 1.4, 2);
+addPlatform( 8,  4.0,-22,  3, 3, 1.0, 3);
+
+// ── Trees ─────────────────────────────────────────────────────────────────────
+
+function addTree(x, z, scale) {
+  const s = scale || 1;
+  const trunk = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.18 * s, 0.28 * s, 2.2 * s, 7),
+    new THREE.MeshLambertMaterial({ color: 0x6d4c41 })
+  );
+  trunk.position.set(x, 1.1 * s, z);
+  trunk.castShadow = true;
+  scene.add(trunk);
+
+  const crown = new THREE.Mesh(
+    new THREE.ConeGeometry(1.2 * s, 3.0 * s, 7),
+    new THREE.MeshLambertMaterial({ color: 0x2e7d32 })
+  );
+  crown.position.set(x, 3.8 * s, z);
+  crown.castShadow = true;
+  scene.add(crown);
+}
+
+[
+  [-8,-16,1.1],[14,-14,1.3],[-17,-7,0.9],[9,9,1.2],
+  [-12,11,1.0],[3,15,1.4],[22,2,1.2],[-22,7,0.8],
+  [6,18,1.1],[-7,17,1.3],[18,-20,0.9],[-18,-18,1.1]
+].forEach(([x,z,s]) => addTree(x, z, s));
+
+// ── Coins (stars) ─────────────────────────────────────────────────────────────
+
+const coinMat = new THREE.MeshLambertMaterial({ color: 0xffd700, emissive: 0x886600 });
+const coins = [];
+
+const coinSpots = [
+  [3, 0.8, -2],   [7, 1.5, -5],   [11, 3.0, -9],  [16, 4.2, -6],
+  [-4, 0.8, -5],  [-10, 2.4, -4], [-14, 4.4, -9],  [0, 5.2, -18],
+  [2, 1.8, -12],  [8, 5.6, -22],
 ];
 
-const ANIMALS = [
-  { emoji: '🐱', label: 'Katze',   bodyColor: '#ff8a65' },
-  { emoji: '🐶', label: 'Hund',    bodyColor: '#8d6e63' },
-  { emoji: '🐸', label: 'Frosch',  bodyColor: '#43a047' },
-  { emoji: '🐰', label: 'Hase',    bodyColor: '#f8bbd0' },
-  { emoji: '🦊', label: 'Fuchs',   bodyColor: '#ef6c00' },
-  { emoji: '🐼', label: 'Panda',   bodyColor: '#546e7a' },
-  { emoji: '🐯', label: 'Tiger',   bodyColor: '#f9a825' },
-  { emoji: '🦄', label: 'Einhorn', bodyColor: '#ce93d8' },
-];
+coinSpots.forEach(([x, y, z]) => {
+  const mesh = new THREE.Mesh(new THREE.TorusGeometry(0.28, 0.09, 10, 18), coinMat);
+  mesh.rotation.x = Math.PI / 2;
+  mesh.position.set(x, y + 0.7, z);
+  mesh.castShadow = true;
+  scene.add(mesh);
+  coins.push({ mesh, collected: false, baseY: y + 0.7 });
+});
 
-// ── Canvas / DOM ──────────────────────────────────────────────────────────────
-
-const canvas      = document.getElementById('canvas');
-const ctx         = canvas.getContext('2d');
-const W = canvas.width, H = canvas.height;
-
-const screens = {
-  start:    document.getElementById('screen-start'),
-  char:     document.getElementById('screen-char'),
-  gameover: document.getElementById('screen-gameover'),
-};
-
-function showScreen(name) {
-  Object.values(screens).forEach(s => s.classList.remove('active'));
-  if (name) screens[name].classList.add('active');
-}
-
-// ── State ─────────────────────────────────────────────────────────────────────
-
-let player, hazards, collectibles, hearts, score, collectedCount, lives, level;
-let speed, hazardTimer, hazardInterval, collectTimer, collectInterval, heartTimer;
-let running = false, keys = {}, raf, invincible = 0;
-let selectedChar = HUMANS[0];
-let popups = [];   // floating "+X" text effects
-
-// ── Build character grids ─────────────────────────────────────────────────────
-
-function buildGrid(containerId, list) {
-  const grid = document.getElementById(containerId);
-  list.forEach((ch, i) => {
-    const card = document.createElement('div');
-    card.className = 'char-card';
-    card.dataset.idx = i;
-    card.dataset.group = containerId;
-    card.innerHTML = `${ch.emoji}<span class="label">${ch.label}</span>`;
-    card.addEventListener('click', () => selectChar(ch, card));
-    grid.appendChild(card);
-  });
-}
-
-buildGrid('grid-humans',  HUMANS);
-buildGrid('grid-animals', ANIMALS);
-
-// pre-select first
-document.querySelector('#grid-humans .char-card').classList.add('selected');
-
-function selectChar(ch, card) {
-  document.querySelectorAll('.char-card').forEach(c => c.classList.remove('selected'));
-  card.classList.add('selected');
-  selectedChar = ch;
-}
+const scoreEl = document.getElementById('score');
+const fallenEl = document.getElementById('fallen-msg');
+let coinCount = 0;
 
 // ── Player ────────────────────────────────────────────────────────────────────
 
-const GROUND_Y = H - 70;
-const GRAVITY  = 0.5;
-const JUMP_FORCE = -12;
+const playerGroup = new THREE.Group();
+scene.add(playerGroup);
 
-function makePlayer() {
-  return { x: W / 2, y: GROUND_Y, w: 56, h: 80, speed: 5.5, legAnim: 0, vy: 0, onGround: true };
-}
+// Body
+const body = new THREE.Mesh(
+  new THREE.BoxGeometry(0.55, 0.72, 0.38),
+  new THREE.MeshLambertMaterial({ color: 0x3a6fff })
+);
+body.position.y = 0.86;
+body.castShadow = true;
+playerGroup.add(body);
 
-// ── Falling objects ───────────────────────────────────────────────────────────
+// Head
+const head = new THREE.Mesh(
+  new THREE.BoxGeometry(0.5, 0.48, 0.48),
+  new THREE.MeshLambertMaterial({ color: 0xffcc80 })
+);
+head.position.y = 1.42;
+head.castShadow = true;
+playerGroup.add(head);
 
-const HAZARD_EMOJIS    = ['💣', '🪨', '🔥', '❌', '☄️'];
-const COLLECT_EMOJIS   = ['⭐', '💎', '🍀', '🪙', '🍎', '💰'];
-const COLLECT_POINTS   = { '⭐': 3, '💎': 5, '🍀': 4, '🪙': 2, '🍎': 2, '💰': 6 };
+// Eyes
+const eyeMat = new THREE.MeshLambertMaterial({ color: 0x111122 });
+[-0.11, 0.11].forEach(xOff => {
+  const eye = new THREE.Mesh(new THREE.SphereGeometry(0.065, 7, 7), eyeMat);
+  eye.position.set(xOff, 1.46, 0.24);
+  playerGroup.add(eye);
+});
 
-function spawnHazard() {
-  const size = 30 + Math.random() * 8;
-  return {
-    x:     size / 2 + Math.random() * (W - size),
-    y:     -size - 20,
-    w:     size,
-    h:     size,
-    vy:    speed * (0.75 + Math.random() * 0.55),
-    emoji: HAZARD_EMOJIS[Math.floor(Math.random() * HAZARD_EMOJIS.length)],
-    type:  'hazard',
-    angle: 0,
-    rot:   (Math.random() - 0.5) * 0.05,
-  };
-}
+// Legs
+const legMat = new THREE.MeshLambertMaterial({ color: 0x1a237e });
+const legs = [];
+[-0.145, 0.145].forEach(xOff => {
+  const leg = new THREE.Mesh(new THREE.BoxGeometry(0.21, 0.52, 0.21), legMat);
+  leg.position.set(xOff, 0.26, 0);
+  leg.castShadow = true;
+  playerGroup.add(leg);
+  legs.push(leg);
+});
 
-function spawnCollectible() {
-  const size = 30;
-  const emoji = COLLECT_EMOJIS[Math.floor(Math.random() * COLLECT_EMOJIS.length)];
-  return {
-    x:     size / 2 + Math.random() * (W - size),
-    y:     -size - 20,
-    w:     size,
-    h:     size,
-    vy:    (speed * 0.55) * (0.8 + Math.random() * 0.4),
-    emoji,
-    pts:   COLLECT_POINTS[emoji],
-    pulse: 0,
-    type:  'collect',
-  };
-}
+// Arms
+const armMat = new THREE.MeshLambertMaterial({ color: 0x2255dd });
+const arms = [];
+[-0.39, 0.39].forEach(xOff => {
+  const arm = new THREE.Mesh(new THREE.BoxGeometry(0.19, 0.52, 0.19), armMat);
+  arm.position.set(xOff, 0.88, 0);
+  arm.castShadow = true;
+  playerGroup.add(arm);
+  arms.push(arm);
+});
 
-// ── Reset ─────────────────────────────────────────────────────────────────────
+// ── Player State ──────────────────────────────────────────────────────────────
 
-function spawnHeart() {
-  const size = 32;
-  return {
-    x:   size / 2 + Math.random() * (W - size),
-    y:   -size - 20,
-    w:   size,
-    h:   size,
-    vy:  1.4 + Math.random() * 0.6,
-    pulse: 0,
-    type: 'heart',
-  };
-}
+const player = {
+  pos:      new THREE.Vector3(0, 0, 3),
+  vel:      new THREE.Vector3(0, 0, 0),
+  yaw:      0,
+  onGround: true,
+};
 
-function reset() {
-  player          = makePlayer();
-  hazards         = [];
-  collectibles    = [];
-  hearts          = [];
-  popups          = [];
-  score           = 0;
-  collectedCount  = 0;
-  lives           = 3;
-  level           = 1;
-  speed           = 2.6;
-  hazardTimer     = 0;
-  hazardInterval  = 85;
-  collectTimer    = 0;
-  collectInterval = 140;
-  heartTimer      = 0;
-  invincible      = 0;
-  updateHUD();
-}
+// ── Camera State ──────────────────────────────────────────────────────────────
 
-function updateHUD() {
-  document.getElementById('score').textContent     = score;
-  document.getElementById('level').textContent     = level;
-  document.getElementById('lives').textContent     = '❤️'.repeat(lives);
-  document.getElementById('collected').textContent = collectedCount;
-}
+let camYaw   = 0;
+let camPitch = 0.38;
+const CAM_DIST = 7;
 
-// ── Drawing ───────────────────────────────────────────────────────────────────
+// ── Input ─────────────────────────────────────────────────────────────────────
 
-function drawBg() {
-  ctx.fillStyle = '#0d0d2b';
-  ctx.fillRect(0, 0, W, H);
-  ctx.strokeStyle = '#1a1f40';
-  ctx.lineWidth = 1;
-  for (let y = 0; y < H; y += 60) {
-    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+const keys = {};
+document.addEventListener('keydown', e => {
+  keys[e.code] = true;
+  if (['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code)) e.preventDefault();
+});
+document.addEventListener('keyup', e => { keys[e.code] = false; });
+
+// Mouse look
+let mouseDragging = false, lastMx = 0, lastMy = 0;
+renderer.domElement.addEventListener('mousedown', e => {
+  mouseDragging = true; lastMx = e.clientX; lastMy = e.clientY;
+});
+document.addEventListener('mouseup', () => mouseDragging = false);
+document.addEventListener('mousemove', e => {
+  if (!mouseDragging) return;
+  camYaw   -= (e.clientX - lastMx) * 0.004;
+  camPitch  = Math.max(0.08, Math.min(1.3, camPitch - (e.clientY - lastMy) * 0.004));
+  lastMx = e.clientX; lastMy = e.clientY;
+});
+
+// Touch
+let touchLast = null;
+window.addEventListener('touchstart', e => {
+  touchLast = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+}, { passive: true });
+window.addEventListener('touchmove', e => {
+  if (!touchLast) return;
+  const dx = e.touches[0].clientX - touchLast.x;
+  const dy = e.touches[0].clientY - touchLast.y;
+  camYaw   -= dx * 0.006;
+  camPitch  = Math.max(0.08, Math.min(1.3, camPitch - dy * 0.006));
+  touchLast = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+}, { passive: true });
+
+// ── Physics constants ─────────────────────────────────────────────────────────
+
+const GRAVITY    = -22;
+const JUMP_VEL   = 9.5;
+const MOVE_SPEED = 5.8;
+const TURN_SPEED = 2.2;
+
+let legAnim = 0;
+let fallenTimer = 0;
+
+function getGroundY(px, py, pz) {
+  let gy = 0;
+  for (const p of platforms) {
+    if (px > p.cx - p.halfW - 0.28 && px < p.cx + p.halfW + 0.28 &&
+        pz > p.cz - p.halfD - 0.28 && pz < p.cz + p.halfD + 0.28 &&
+        py >= p.top - 0.45) {
+      gy = Math.max(gy, p.top);
+    }
   }
-  ctx.strokeStyle = '#223';
-  ctx.lineWidth = 2;
-  ctx.beginPath(); ctx.moveTo(0, H - 16); ctx.lineTo(W, H - 16); ctx.stroke();
-}
-
-function drawCharacter(p) {
-  if (invincible > 0 && Math.floor(invincible / 5) % 2 === 0) return;
-
-  const moving = keys['ArrowLeft'] || keys['a'] || keys['A'] ||
-                 keys['ArrowRight'] || keys['d'] || keys['D'];
-  if (moving) p.legAnim = (p.legAnim + 0.18) % (Math.PI * 2);
-
-  const headY  = p.y - p.h / 2 + 28;   // center of emoji head
-  const bodyY  = headY + 36;
-  const footY  = p.y + p.h / 2;
-  const legSwing = Math.sin(p.legAnim) * (moving ? 10 : 0);
-
-  ctx.save();
-
-  // ground shadow
-  ctx.fillStyle = 'rgba(0,0,0,0.35)';
-  ctx.beginPath();
-  ctx.ellipse(p.x, footY + 4, 22, 6, 0, 0, Math.PI * 2);
-  ctx.fill();
-
-  // body (torso)
-  const bodyColor = selectedChar.bodyColor || '#3a6fff';
-  ctx.fillStyle = bodyColor;
-  ctx.beginPath();
-  ctx.roundRect(p.x - 14, bodyY - 2, 28, 26, 6);
-  ctx.fill();
-
-  // legs
-  ctx.strokeStyle = bodyColor;
-  ctx.lineWidth   = 7;
-  ctx.lineCap     = 'round';
-  ctx.beginPath();
-  // left leg
-  ctx.moveTo(p.x - 7, bodyY + 22);
-  ctx.lineTo(p.x - 7 + legSwing * 0.5,  footY);
-  // right leg
-  ctx.moveTo(p.x + 7, bodyY + 22);
-  ctx.lineTo(p.x + 7 - legSwing * 0.5,  footY);
-  ctx.stroke();
-
-  // feet
-  ctx.fillStyle = '#555';
-  ctx.beginPath();
-  ctx.ellipse(p.x - 7 + legSwing * 0.5, footY + 3, 7, 4, 0, 0, Math.PI * 2);
-  ctx.ellipse(p.x + 7 - legSwing * 0.5, footY + 3, 7, 4, 0, 0, Math.PI * 2);
-  ctx.fill();
-
-  // arms
-  ctx.strokeStyle = bodyColor;
-  ctx.lineWidth   = 5;
-  ctx.beginPath();
-  ctx.moveTo(p.x - 14, bodyY + 4);
-  ctx.lineTo(p.x - 22, bodyY + 14 + legSwing * 0.4);
-  ctx.moveTo(p.x + 14, bodyY + 4);
-  ctx.lineTo(p.x + 22, bodyY + 14 - legSwing * 0.4);
-  ctx.stroke();
-
-  // emoji head (big, centered)
-  ctx.shadowColor = '#3a6fff88';
-  ctx.shadowBlur  = 16;
-  ctx.font        = '52px serif';
-  ctx.textAlign   = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(selectedChar.emoji, p.x, headY);
-  ctx.shadowBlur  = 0;
-
-  // name label below feet
-  ctx.fillStyle   = 'rgba(255,255,255,0.75)';
-  ctx.font        = 'bold 11px sans-serif';
-  ctx.textAlign   = 'center';
-  ctx.textBaseline = 'top';
-  ctx.fillText(selectedChar.label, p.x, footY + 10);
-
-  ctx.restore();
-}
-
-function drawFalling(o) {
-  ctx.save();
-  ctx.translate(o.x, o.y);
-
-  if (o.type === 'hazard') {
-    o.angle = (o.angle || 0) + (o.rot || 0);
-    ctx.rotate(o.angle);
-
-    // gleicher Hintergrund für alle
-    ctx.fillStyle = 'rgba(30, 30, 60, 0.80)';
-    ctx.beginPath();
-    ctx.arc(0, 0, o.w * 0.54, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.strokeStyle = 'rgba(200, 200, 255, 0.55)';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.arc(0, 0, o.w * 0.54, 0, Math.PI * 2);
-    ctx.stroke();
-
-    ctx.shadowBlur = 0;
-    ctx.font = `${o.w * 0.72}px serif`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(o.emoji, 0, 0);
-
-    ctx.restore();
-
-    ctx.save();
-    ctx.fillStyle = 'rgba(255,255,255,0.6)';
-    ctx.font = 'bold 10px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText('ACHTUNG!', o.x, o.y + o.w * 0.62);
-    ctx.restore();
-
-  } else {
-    o.pulse = (o.pulse || 0) + 0.1;
-    const p = 0.5 + 0.5 * Math.sin(o.pulse);
-
-    // gleicher Hintergrund für alle
-    ctx.fillStyle = 'rgba(30, 30, 60, 0.80)';
-    ctx.beginPath();
-    ctx.arc(0, 0, o.w * 0.54, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.strokeStyle = `rgba(200, 200, 255, ${0.4 + p * 0.35})`;
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.arc(0, 0, o.w * 0.54, 0, Math.PI * 2);
-    ctx.stroke();
-
-    ctx.shadowBlur = 0;
-    ctx.font = `${o.w * 0.72}px serif`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(o.emoji, 0, 0);
-    ctx.shadowBlur = 0;
-
-    ctx.restore();
-
-    // Points label underneath
-    ctx.save();
-    ctx.fillStyle = 'rgba(255,255,255,0.6)';
-    ctx.font = 'bold 10px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText(`+${o.pts} Pkt`, o.x, o.y + o.w * 0.62);
-    ctx.restore();
-  }
-}
-
-function drawHeart(o) {
-  o.pulse = (o.pulse || 0) + 0.08;
-  const scale = 1 + 0.12 * Math.sin(o.pulse);
-
-  ctx.save();
-  ctx.translate(o.x, o.y);
-  ctx.scale(scale, scale);
-
-  // pink background circle
-  ctx.fillStyle = 'rgba(30, 30, 60, 0.80)';
-  ctx.beginPath();
-  ctx.arc(0, 0, o.w * 0.54, 0, Math.PI * 2);
-  ctx.fill();
-
-  ctx.strokeStyle = `rgba(255, 100, 150, ${0.6 + 0.4 * Math.sin(o.pulse)})`;
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.arc(0, 0, o.w * 0.54, 0, Math.PI * 2);
-  ctx.stroke();
-
-  ctx.font = `${o.w * 0.72}px serif`;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText('❤️', 0, 0);
-
-  ctx.restore();
-
-  ctx.save();
-  ctx.fillStyle = 'rgba(255,150,180,0.8)';
-  ctx.font = 'bold 10px sans-serif';
-  ctx.textAlign = 'center';
-  ctx.fillText('+1 Leben', o.x, o.y + o.w * 0.62);
-  ctx.restore();
-}
-
-function drawPopups() {
-  popups.forEach(p => {
-    ctx.globalAlpha = p.alpha;
-    ctx.fillStyle   = p.color || '#ffd700';
-    ctx.font        = `bold ${p.size}px sans-serif`;
-    ctx.textAlign   = 'center';
-    ctx.fillText(p.text, p.x, p.y);
-    ctx.globalAlpha = 1;
-  });
-}
-
-function drawScoreBg() {
-  ctx.fillStyle = 'rgba(255,255,255,0.05)';
-  ctx.font = 'bold 90px sans-serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(score, W / 2, H / 2 - 20);
-}
-
-// ── Collision ─────────────────────────────────────────────────────────────────
-
-function overlap(ax, ay, ar, bx, by, br) {
-  const dx = ax - bx, dy = ay - by;
-  return Math.sqrt(dx * dx + dy * dy) < ar + br;
+  return gy;
 }
 
 // ── Update ────────────────────────────────────────────────────────────────────
 
-function update() {
-  // Move player
-  let dx = 0;
-  if (keys['ArrowLeft']  || keys['a'] || keys['A']) dx -= player.speed;
-  if (keys['ArrowRight'] || keys['d'] || keys['D']) dx += player.speed;
-  player.x = Math.max(player.w / 2, Math.min(W - player.w / 2, player.x + dx));
+function update(dt) {
+  const ps = player;
+
+  // Turning
+  const turnAmt = TURN_SPEED * dt;
+  if (keys['KeyA'] || keys['ArrowLeft'])  { ps.yaw += turnAmt; camYaw += turnAmt; }
+  if (keys['KeyD'] || keys['ArrowRight']) { ps.yaw -= turnAmt; camYaw -= turnAmt; }
+
+  // Movement direction (player facing)
+  const fwdX = -Math.sin(ps.yaw);
+  const fwdZ = -Math.cos(ps.yaw);
+  let moving = false;
+
+  if (keys['KeyW'] || keys['ArrowUp']) {
+    ps.vel.x = fwdX * MOVE_SPEED;
+    ps.vel.z = fwdZ * MOVE_SPEED;
+    moving = true;
+  } else if (keys['KeyS'] || keys['ArrowDown']) {
+    ps.vel.x = -fwdX * MOVE_SPEED;
+    ps.vel.z = -fwdZ * MOVE_SPEED;
+    moving = true;
+  } else {
+    ps.vel.x *= 0.75;
+    ps.vel.z *= 0.75;
+    if (Math.abs(ps.vel.x) < 0.02) ps.vel.x = 0;
+    if (Math.abs(ps.vel.z) < 0.02) ps.vel.z = 0;
+    moving = Math.abs(ps.vel.x) + Math.abs(ps.vel.z) > 0.1;
+  }
 
   // Jump
-  if ((keys[' '] || keys['ArrowUp'] || keys['w'] || keys['W']) && player.onGround) {
-    player.vy = JUMP_FORCE;
-    player.onGround = false;
-  }
-  player.vy += GRAVITY;
-  player.y  += player.vy;
-  if (player.y >= GROUND_Y) {
-    player.y = GROUND_Y;
-    player.vy = 0;
-    player.onGround = true;
+  if (keys['Space'] && ps.onGround) {
+    ps.vel.y = JUMP_VEL;
+    ps.onGround = false;
   }
 
-  // Spawn hazards
-  if (++hazardTimer >= hazardInterval) {
-    hazards.push(spawnHazard());
-    hazardTimer = 0;
+  // Gravity
+  if (!ps.onGround) ps.vel.y += GRAVITY * dt;
+  ps.vel.y = Math.max(ps.vel.y, -18);
+
+  // Integrate
+  ps.pos.x += ps.vel.x * dt;
+  ps.pos.y += ps.vel.y * dt;
+  ps.pos.z += ps.vel.z * dt;
+
+  // Ground / platform collision
+  const gy = getGroundY(ps.pos.x, ps.pos.y, ps.pos.z);
+  if (ps.pos.y <= gy) {
+    ps.pos.y = gy;
+    ps.vel.y = 0;
+    ps.onGround = true;
+  } else {
+    ps.onGround = false;
   }
 
-  // Spawn collectibles
-  if (++collectTimer >= collectInterval) {
-    collectibles.push(spawnCollectible());
-    collectTimer = 0;
+  // World boundary
+  ps.pos.x = Math.max(-45, Math.min(45, ps.pos.x));
+  ps.pos.z = Math.max(-45, Math.min(45, ps.pos.z));
+
+  // Fall off world → respawn
+  if (ps.pos.y < -6) {
+    ps.pos.set(0, 0, 3);
+    ps.vel.set(0, 0, 0);
+    ps.onGround = true;
+    fallenTimer = 2.0;
   }
 
-  // Spawn hearts (alle 600 frames, seltener wenn viele Leben)
-  heartTimer++;
-  const heartInterval = lives >= 5 ? 9999 : 500 + Math.random() * 200;
-  if (heartTimer >= heartInterval) {
-    hearts.push(spawnHeart());
-    heartTimer = 0;
+  // "Fallen" message
+  if (fallenTimer > 0) {
+    fallenTimer -= dt;
+    fallenEl.style.opacity = Math.min(1, fallenTimer * 3);
+  } else {
+    fallenEl.style.opacity = 0;
   }
 
-  const pr = player.w * 0.30;   // hitbox nur um den Körper, nicht den ganzen Kopf
+  // Update mesh
+  playerGroup.position.copy(ps.pos);
+  playerGroup.rotation.y = ps.yaw;
 
-  // Move & check hazards
-  if (invincible > 0) invincible--;
-  for (let i = hazards.length - 1; i >= 0; i--) {
-    hazards[i].y += hazards[i].vy;
-    if (hazards[i].y > H + 20) { hazards.splice(i, 1); score++; updateHUD(); continue; }
-    if (invincible === 0 && overlap(player.x, player.y, pr, hazards[i].x, hazards[i].y, hazards[i].w * 0.42)) {
-      lives--;
-      invincible = 90;
-      updateHUD();
-      if (lives <= 0) { gameOver(); return; }
+  // Leg/arm animation
+  const inAir = !ps.onGround;
+  if (moving && ps.onGround) legAnim += dt * 9;
+  const swing = Math.sin(legAnim) * (moving ? 0.55 : 0);
+  legs[0].rotation.x =  swing;
+  legs[1].rotation.x = -swing;
+  arms[0].rotation.x = -swing * 0.6;
+  arms[1].rotation.x =  swing * 0.6;
+
+  // Squash/stretch on jump
+  const jumpStretch = inAir ? 1.15 : (ps.onGround && ps.vel.y === 0 ? 1.0 : 1.0);
+  playerGroup.scale.y = jumpStretch;
+
+  // Coin animation + collection
+  coins.forEach((c, i) => {
+    if (c.collected) return;
+    c.mesh.rotation.y += dt * 2.2;
+    c.mesh.position.y = c.baseY + Math.sin(Date.now() / 800 + i * 1.3) * 0.12;
+
+    const dx = ps.pos.x - c.mesh.position.x;
+    const dy = ps.pos.y + 0.8 - c.mesh.position.y;
+    const dz = ps.pos.z - c.mesh.position.z;
+    if (dx * dx + dy * dy + dz * dz < 1.1) {
+      c.collected = true;
+      scene.remove(c.mesh);
+      coinCount++;
+      scoreEl.textContent = coinCount === coins.length
+        ? `🎉 Alle Sterne gesammelt!`
+        : `⭐ ${coinCount} / ${coins.length}`;
     }
-  }
+  });
 
-  // Move & check collectibles
-  for (let i = collectibles.length - 1; i >= 0; i--) {
-    collectibles[i].y += collectibles[i].vy;
-    if (collectibles[i].y > H + 20) { collectibles.splice(i, 1); continue; }
-    if (overlap(player.x, player.y, pr + 4, collectibles[i].x, collectibles[i].y, collectibles[i].w * 0.5)) {
-      const pts = collectibles[i].pts;
-      score += pts;
-      collectedCount++;
-      popups.push({ x: collectibles[i].x, y: collectibles[i].y, text: `+${pts}`, alpha: 1, size: 22 });
-      collectibles.splice(i, 1);
-      updateHUD();
-    }
-  }
-
-  // Move & check hearts
-  for (let i = hearts.length - 1; i >= 0; i--) {
-    hearts[i].y += hearts[i].vy;
-    if (hearts[i].y > H + 20) { hearts.splice(i, 1); continue; }
-    if (overlap(player.x, player.y, pr + 6, hearts[i].x, hearts[i].y, hearts[i].w * 0.5)) {
-      lives = Math.min(lives + 1, 5);
-      popups.push({ x: hearts[i].x, y: hearts[i].y, text: '+❤️', alpha: 1, size: 22, color: '#ff6b8a' });
-      hearts.splice(i, 1);
-      updateHUD();
-    }
-  }
-
-  // Popups
-  for (let i = popups.length - 1; i >= 0; i--) {
-    popups[i].y    -= 1.2;
-    popups[i].alpha -= 0.022;
-    if (popups[i].alpha <= 0) popups.splice(i, 1);
-  }
-
-  // Difficulty ramp
-  const newLevel = 1 + Math.floor(score / 12);
-  if (newLevel !== level) {
-    level           = newLevel;
-    speed           = 2.6 + (level - 1) * 0.45;
-    hazardInterval  = Math.max(32, 85 - (level - 1) * 7);
-    collectInterval = Math.max(60, 140 - (level - 1) * 8);
-    updateHUD();
-  }
+  // Camera follow (smooth lerp)
+  const tx = ps.pos.x + Math.sin(camYaw) * Math.cos(camPitch) * CAM_DIST;
+  const ty = ps.pos.y + 1.5 + Math.sin(camPitch) * CAM_DIST;
+  const tz = ps.pos.z + Math.cos(camYaw) * Math.cos(camPitch) * CAM_DIST;
+  const lerpSpeed = 0.12;
+  camera.position.x += (tx - camera.position.x) * lerpSpeed;
+  camera.position.y += (ty - camera.position.y) * lerpSpeed;
+  camera.position.z += (tz - camera.position.z) * lerpSpeed;
+  camera.lookAt(ps.pos.x, ps.pos.y + 1, ps.pos.z);
 }
 
-function draw() {
-  drawBg();
-  drawScoreBg();
-  collectibles.forEach(drawFalling);
-  hazards.forEach(drawFalling);
-  hearts.forEach(drawHeart);
-  drawCharacter(player);
-  drawPopups();
+// ── Render loop ───────────────────────────────────────────────────────────────
 
-  // Legend bottom-left
-  ctx.globalAlpha = 0.55;
-  ctx.font = '11px sans-serif';
-  ctx.textAlign = 'left';
-  ctx.fillStyle = '#88f';
-  ctx.fillText('💣 ausweichen  ⭐ einsammeln  ❤️ Leben', 10, H - 3);
-  ctx.globalAlpha = 1;
+let prevTime = 0;
+function loop(t) {
+  requestAnimationFrame(loop);
+  const dt = Math.min((t - prevTime) / 1000, 0.05);
+  prevTime = t;
+  if (dt > 0) update(dt);
+  renderer.render(scene, camera);
 }
-
-function loop() {
-  if (!running) return;
-  update();
-  draw();
-  raf = requestAnimationFrame(loop);
-}
-
-// ── Game over ─────────────────────────────────────────────────────────────────
-
-function gameOver() {
-  running = false;
-  cancelAnimationFrame(raf);
-  document.getElementById('final-score').textContent =
-    `Punkte: ${score}  |  ⭐ ${collectedCount} gesammelt`;
-  document.getElementById('final-msg').textContent =
-    `Level ${level} erreicht als ${selectedChar.emoji} ${selectedChar.label}!`;
-  showScreen('gameover');
-}
-
-// ── Navigation ────────────────────────────────────────────────────────────────
-
-document.getElementById('btn-to-char').addEventListener('click', () => showScreen('char'));
-
-document.getElementById('btn-start').addEventListener('click', () => {
-  showScreen(null);
-  reset();
-  running = true;
-  raf = requestAnimationFrame(loop);
-});
-
-document.getElementById('btn-replay').addEventListener('click', () => {
-  showScreen(null);
-  reset();
-  running = true;
-  raf = requestAnimationFrame(loop);
-});
-
-document.getElementById('btn-charselect').addEventListener('click', () => showScreen('char'));
-
-// ── Input ─────────────────────────────────────────────────────────────────────
-
-document.addEventListener('keydown', e => { keys[e.key] = true; });
-document.addEventListener('keyup',   e => { keys[e.key] = false; });
-
-let touchStartX = null;
-let touchStartY = null;
-canvas.addEventListener('touchstart', e => {
-  touchStartX = e.touches[0].clientX;
-  touchStartY = e.touches[0].clientY;
-}, { passive: true });
-canvas.addEventListener('touchmove', e => {
-  if (touchStartX === null || !running) return;
-  const dx = e.touches[0].clientX - touchStartX;
-  const dy = e.touches[0].clientY - touchStartY;
-  if (Math.abs(dx) > 4) {
-    player.x = Math.max(player.w / 2, Math.min(W - player.w / 2, player.x + dx * 0.45));
-    touchStartX = e.touches[0].clientX;
-  }
-  // Wischen nach oben = springen
-  if (dy < -20 && player.onGround) {
-    player.vy = JUMP_FORCE;
-    player.onGround = false;
-    touchStartY = e.touches[0].clientY;
-  }
-}, { passive: true });
+requestAnimationFrame(t => { prevTime = t; requestAnimationFrame(loop); });
 </script>
 </body>
 </html>
