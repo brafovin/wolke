@@ -244,24 +244,26 @@ const COLLECT_EMOJIS   = ['⭐', '💎', '🍀', '🪙', '🍎', '💰'];
 const COLLECT_POINTS   = { '⭐': 3, '💎': 5, '🍀': 4, '🪙': 2, '🍎': 2, '💰': 6 };
 
 function spawnHazard() {
-  const size = 26 + Math.random() * 18;
+  const size = 44 + Math.random() * 12;
   return {
     x:     size / 2 + Math.random() * (W - size),
-    y:     -size,
+    y:     -size - 20,
     w:     size,
     h:     size,
     vy:    speed * (0.75 + Math.random() * 0.55),
     emoji: HAZARD_EMOJIS[Math.floor(Math.random() * HAZARD_EMOJIS.length)],
     type:  'hazard',
+    angle: 0,
+    rot:   (Math.random() - 0.5) * 0.05,
   };
 }
 
 function spawnCollectible() {
-  const size = 28;
+  const size = 44;
   const emoji = COLLECT_EMOJIS[Math.floor(Math.random() * COLLECT_EMOJIS.length)];
   return {
     x:     size / 2 + Math.random() * (W - size),
-    y:     -size,
+    y:     -size - 20,
     w:     size,
     h:     size,
     vy:    (speed * 0.55) * (0.8 + Math.random() * 0.4),
@@ -391,23 +393,83 @@ function drawCharacter(p) {
 }
 
 function drawFalling(o) {
-  ctx.font = `${o.w}px serif`;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
+  ctx.save();
+  ctx.translate(o.x, o.y);
 
-  if (o.type === 'collect') {
-    // golden glow for collectibles
-    const pulse = 0.5 + 0.5 * Math.sin(o.pulse);
-    ctx.shadowColor = '#ffd700';
-    ctx.shadowBlur  = 8 + pulse * 10;
-    o.pulse += 0.12;
+  if (o.type === 'hazard') {
+    // Rotate hazards slowly
+    o.angle = (o.angle || 0) + (o.rot || 0);
+    ctx.rotate(o.angle);
+
+    // Red badge background
+    ctx.fillStyle = 'rgba(180, 20, 20, 0.75)';
+    ctx.beginPath();
+    ctx.arc(0, 0, o.w * 0.54, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Red border ring
+    ctx.strokeStyle = '#ff4444';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(0, 0, o.w * 0.54, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Emoji
+    ctx.shadowColor = '#ff0000';
+    ctx.shadowBlur  = 12;
+    ctx.font = `${o.w * 0.72}px serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(o.emoji, 0, 0);
+    ctx.shadowBlur = 0;
+
+    ctx.restore();
+
+    // Label underneath (outside rotation)
+    ctx.save();
+    ctx.fillStyle = '#ff5555';
+    ctx.font = 'bold 11px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('ACHTUNG!', o.x, o.y + o.w * 0.62);
+    ctx.restore();
+
   } else {
-    ctx.shadowColor = '#ff3030';
-    ctx.shadowBlur  = 6;
-  }
+    // Pulsing gold background for collectibles
+    o.pulse = (o.pulse || 0) + 0.1;
+    const p = 0.5 + 0.5 * Math.sin(o.pulse);
 
-  ctx.fillText(o.emoji, o.x, o.y);
-  ctx.shadowBlur = 0;
+    // Gold badge background
+    ctx.fillStyle = `rgba(180, 140, 0, ${0.55 + p * 0.25})`;
+    ctx.beginPath();
+    ctx.arc(0, 0, o.w * 0.54, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Gold border ring
+    ctx.strokeStyle = `rgba(255, 220, 50, ${0.7 + p * 0.3})`;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(0, 0, o.w * 0.54, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Emoji
+    ctx.shadowColor = '#ffd700';
+    ctx.shadowBlur  = 10 + p * 14;
+    ctx.font = `${o.w * 0.72}px serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(o.emoji, 0, 0);
+    ctx.shadowBlur = 0;
+
+    ctx.restore();
+
+    // Points label underneath
+    ctx.save();
+    ctx.fillStyle = '#ffd700';
+    ctx.font = 'bold 12px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(`+${o.pts} Pkt`, o.x, o.y + o.w * 0.62);
+    ctx.restore();
+  }
 }
 
 function drawPopups() {
