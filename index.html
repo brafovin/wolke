@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Ausweich-Spiel</title>
+  <title>Ausweich & Sammel Spiel</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -13,7 +13,7 @@
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      height: 100vh;
+      min-height: 100vh;
       font-family: 'Segoe UI', sans-serif;
       color: #fff;
       overflow: hidden;
@@ -21,13 +21,13 @@
 
     #hud {
       display: flex;
-      gap: 40px;
-      margin-bottom: 12px;
-      font-size: 18px;
+      gap: 28px;
+      margin-bottom: 10px;
+      font-size: 17px;
       font-weight: bold;
     }
-
     #hud span { color: #aef; }
+    #collected-hud { color: #ffd700; }
 
     #canvas {
       border: 2px solid #334;
@@ -36,41 +36,76 @@
       display: block;
     }
 
-    #overlay {
+    /* ── Overlays ── */
+    .screen {
       position: absolute;
-      display: flex;
+      display: none;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      gap: 18px;
+      gap: 16px;
       text-align: center;
+      padding: 20px;
     }
+    .screen.active { display: flex; }
 
-    #overlay h1 { font-size: 48px; color: #7af; letter-spacing: 2px; }
-    #overlay p  { font-size: 16px; color: #aac; max-width: 340px; line-height: 1.6; }
+    .screen h1 { font-size: 42px; color: #7af; letter-spacing: 2px; }
+    .screen h2 { font-size: 24px; color: #cde; margin-bottom: 4px; }
+    .screen p  { font-size: 14px; color: #99b; max-width: 360px; line-height: 1.6; }
 
-    #overlay button {
-      padding: 14px 40px;
-      font-size: 20px;
+    .btn {
+      padding: 12px 36px;
+      font-size: 18px;
       background: #3a6fff;
       color: #fff;
       border: none;
       border-radius: 8px;
       cursor: pointer;
-      transition: background 0.2s;
+      transition: background 0.2s, transform 0.1s;
+    }
+    .btn:hover  { background: #5a8fff; }
+    .btn:active { transform: scale(0.96); }
+
+    .score-display { font-size: 26px; color: #fa0; }
+
+    /* ── Character picker ── */
+    .char-section { width: 100%; max-width: 400px; }
+    .char-section h3 { font-size: 14px; color: #88a; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px; }
+
+    .char-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: center;
+      margin-bottom: 14px;
     }
 
-    #overlay button:hover { background: #5a8fff; }
-
-    #overlay .score-display {
-      font-size: 28px;
-      color: #fa0;
+    .char-card {
+      font-size: 36px;
+      width: 62px;
+      height: 62px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      border-radius: 10px;
+      border: 2px solid #334;
+      background: #11152a;
+      cursor: pointer;
+      transition: border-color 0.15s, transform 0.1s, background 0.15s;
+      position: relative;
     }
-
-    .controls-hint {
-      font-size: 13px;
-      color: #556;
-      margin-top: 8px;
+    .char-card span.label {
+      font-size: 9px;
+      color: #778;
+      margin-top: 2px;
+      line-height: 1;
+    }
+    .char-card:hover  { border-color: #558; background: #1a1f3a; transform: scale(1.06); }
+    .char-card.selected {
+      border-color: #3a6fff;
+      background: #1a2a5a;
+      box-shadow: 0 0 10px #3a6fff88;
     }
   </style>
 </head>
@@ -80,286 +115,403 @@
   <div>Punkte: <span id="score">0</span></div>
   <div>Level: <span id="level">1</span></div>
   <div>Leben: <span id="lives">❤️❤️❤️</span></div>
+  <div id="collected-hud">⭐ <span id="collected">0</span></div>
 </div>
 
-<canvas id="canvas" width="480" height="600"></canvas>
+<canvas id="canvas" width="480" height="580"></canvas>
 
-<div id="overlay">
+<!-- START SCREEN -->
+<div id="screen-start" class="screen active">
   <h1>⚡ AUSWEICHEN ⚡</h1>
-  <p>Bewege den Charakter mit <strong>← →</strong> oder <strong>A D</strong>.<br>
-     Weiche den fallenden Objekten aus so lange wie möglich!</p>
-  <div class="controls-hint">Auf Mobilgeräten: Tippe links/rechts auf den Bildschirm</div>
-  <button id="startBtn">Spielen</button>
+  <p>Weiche den Gefahren aus 💣🪨🔥<br>
+     und sammel die Bonusobjekte ein ⭐💎🍀</p>
+  <button class="btn" id="btn-to-char">Charakter wählen →</button>
+</div>
+
+<!-- CHARACTER SELECT SCREEN -->
+<div id="screen-char" class="screen">
+  <h2>Wähle deinen Charakter</h2>
+
+  <div class="char-section">
+    <h3>👨 Menschen</h3>
+    <div class="char-grid" id="grid-humans"></div>
+  </div>
+
+  <div class="char-section">
+    <h3>🐾 Tiere</h3>
+    <div class="char-grid" id="grid-animals"></div>
+  </div>
+
+  <button class="btn" id="btn-start">Spielen ▶</button>
+</div>
+
+<!-- GAME OVER SCREEN -->
+<div id="screen-gameover" class="screen">
+  <h1>💀 Game Over</h1>
+  <div class="score-display" id="final-score"></div>
+  <p id="final-msg"></p>
+  <button class="btn" id="btn-replay">Nochmal spielen</button>
+  <button class="btn" id="btn-charselect" style="background:#334; font-size:14px; padding:8px 20px;">Charakter wechseln</button>
 </div>
 
 <script>
-const canvas = document.getElementById('canvas');
-const ctx    = canvas.getContext('2d');
-const overlay    = document.getElementById('overlay');
-const startBtn   = document.getElementById('startBtn');
-const scoreEl    = document.getElementById('score');
-const levelEl    = document.getElementById('level');
-const livesEl    = document.getElementById('lives');
+// ── Characters ────────────────────────────────────────────────────────────────
 
-const W = canvas.width;
-const H = canvas.height;
+const HUMANS = [
+  { emoji: '👨', label: 'Mann'    },
+  { emoji: '👩', label: 'Frau'    },
+  { emoji: '👦', label: 'Junge'   },
+  { emoji: '👧', label: 'Mädchen' },
+  { emoji: '🧙', label: 'Zauberer'},
+  { emoji: '🦸', label: 'Held'    },
+  { emoji: '🧜', label: 'Meerjungfrau' },
+  { emoji: '🤴', label: 'Prinz'   },
+];
 
-// ── State ────────────────────────────────────────────────────────────────────
+const ANIMALS = [
+  { emoji: '🐱', label: 'Katze'  },
+  { emoji: '🐶', label: 'Hund'   },
+  { emoji: '🐸', label: 'Frosch' },
+  { emoji: '🐰', label: 'Hase'   },
+  { emoji: '🦊', label: 'Fuchs'  },
+  { emoji: '🐼', label: 'Panda'  },
+  { emoji: '🐯', label: 'Tiger'  },
+  { emoji: '🦄', label: 'Einhorn'},
+];
 
-let player, objects, score, lives, level, speed, spawnTimer, spawnInterval;
-let running = false;
-let keys = {};
-let raf;
-let invincible = 0;   // frames of invincibility after a hit
-let lastTime = 0;
+// ── Canvas / DOM ──────────────────────────────────────────────────────────────
 
-// ── Player ───────────────────────────────────────────────────────────────────
+const canvas      = document.getElementById('canvas');
+const ctx         = canvas.getContext('2d');
+const W = canvas.width, H = canvas.height;
+
+const screens = {
+  start:    document.getElementById('screen-start'),
+  char:     document.getElementById('screen-char'),
+  gameover: document.getElementById('screen-gameover'),
+};
+
+function showScreen(name) {
+  Object.values(screens).forEach(s => s.classList.remove('active'));
+  if (name) screens[name].classList.add('active');
+}
+
+// ── State ─────────────────────────────────────────────────────────────────────
+
+let player, hazards, collectibles, score, collectedCount, lives, level;
+let speed, hazardTimer, hazardInterval, collectTimer, collectInterval;
+let running = false, keys = {}, raf, invincible = 0;
+let selectedChar = HUMANS[0];
+let popups = [];   // floating "+X" text effects
+
+// ── Build character grids ─────────────────────────────────────────────────────
+
+function buildGrid(containerId, list) {
+  const grid = document.getElementById(containerId);
+  list.forEach((ch, i) => {
+    const card = document.createElement('div');
+    card.className = 'char-card';
+    card.dataset.idx = i;
+    card.dataset.group = containerId;
+    card.innerHTML = `${ch.emoji}<span class="label">${ch.label}</span>`;
+    card.addEventListener('click', () => selectChar(ch, card));
+    grid.appendChild(card);
+  });
+}
+
+buildGrid('grid-humans',  HUMANS);
+buildGrid('grid-animals', ANIMALS);
+
+// pre-select first
+document.querySelector('#grid-humans .char-card').classList.add('selected');
+
+function selectChar(ch, card) {
+  document.querySelectorAll('.char-card').forEach(c => c.classList.remove('selected'));
+  card.classList.add('selected');
+  selectedChar = ch;
+}
+
+// ── Player ────────────────────────────────────────────────────────────────────
 
 function makePlayer() {
-  return {
-    x: W / 2,
-    y: H - 60,
-    w: 32,
-    h: 48,
-    vx: 0,
-    speed: 5,
-  };
+  return { x: W / 2, y: H - 50, w: 44, h: 44, speed: 5.5 };
 }
 
 // ── Falling objects ───────────────────────────────────────────────────────────
 
-const SHAPES = ['⬛', '🔴', '💣', '⭐', '🪨'];
+const HAZARD_EMOJIS    = ['💣', '🪨', '🔥', '❌', '☄️'];
+const COLLECT_EMOJIS   = ['⭐', '💎', '🍀', '🪙', '🍎', '💰'];
+const COLLECT_POINTS   = { '⭐': 3, '💎': 5, '🍀': 4, '🪙': 2, '🍎': 2, '💰': 6 };
 
-function spawnObject() {
-  const size = 24 + Math.random() * 20;
+function spawnHazard() {
+  const size = 26 + Math.random() * 18;
   return {
-    x: size / 2 + Math.random() * (W - size),
-    y: -size,
-    w: size,
-    h: size,
-    vy: speed * (0.7 + Math.random() * 0.6),
-    emoji: SHAPES[Math.floor(Math.random() * SHAPES.length)],
+    x:     size / 2 + Math.random() * (W - size),
+    y:     -size,
+    w:     size,
+    h:     size,
+    vy:    speed * (0.75 + Math.random() * 0.55),
+    emoji: HAZARD_EMOJIS[Math.floor(Math.random() * HAZARD_EMOJIS.length)],
+    type:  'hazard',
   };
 }
 
-// ── Init / reset ──────────────────────────────────────────────────────────────
+function spawnCollectible() {
+  const size = 28;
+  const emoji = COLLECT_EMOJIS[Math.floor(Math.random() * COLLECT_EMOJIS.length)];
+  return {
+    x:     size / 2 + Math.random() * (W - size),
+    y:     -size,
+    w:     size,
+    h:     size,
+    vy:    (speed * 0.55) * (0.8 + Math.random() * 0.4),
+    emoji,
+    pts:   COLLECT_POINTS[emoji],
+    pulse: 0,
+    type:  'collect',
+  };
+}
+
+// ── Reset ─────────────────────────────────────────────────────────────────────
 
 function reset() {
-  player        = makePlayer();
-  objects       = [];
-  score         = 0;
-  lives         = 3;
-  level         = 1;
-  speed         = 2.8;
-  spawnTimer    = 0;
-  spawnInterval = 90;   // frames
-  invincible    = 0;
+  player          = makePlayer();
+  hazards         = [];
+  collectibles    = [];
+  popups          = [];
+  score           = 0;
+  collectedCount  = 0;
+  lives           = 3;
+  level           = 1;
+  speed           = 2.6;
+  hazardTimer     = 0;
+  hazardInterval  = 85;
+  collectTimer    = 0;
+  collectInterval = 140;
+  invincible      = 0;
   updateHUD();
 }
 
 function updateHUD() {
-  scoreEl.textContent = score;
-  levelEl.textContent = level;
-  livesEl.textContent = '❤️'.repeat(lives);
+  document.getElementById('score').textContent     = score;
+  document.getElementById('level').textContent     = level;
+  document.getElementById('lives').textContent     = '❤️'.repeat(lives);
+  document.getElementById('collected').textContent = collectedCount;
 }
 
 // ── Drawing ───────────────────────────────────────────────────────────────────
 
-function drawPlayer(p) {
-  if (invincible > 0 && Math.floor(invincible / 5) % 2 === 0) return; // blink
-
-  ctx.save();
-
-  // Body
-  ctx.fillStyle = '#3a6fff';
-  ctx.beginPath();
-  ctx.roundRect(p.x - p.w / 2, p.y - p.h / 2 + 14, p.w, p.h - 14, 6);
-  ctx.fill();
-
-  // Head
-  ctx.fillStyle = '#f9c784';
-  ctx.beginPath();
-  ctx.arc(p.x, p.y - p.h / 2 + 10, 12, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Eyes
-  ctx.fillStyle = '#222';
-  ctx.beginPath();
-  ctx.arc(p.x - 4, p.y - p.h / 2 + 8, 2, 0, Math.PI * 2);
-  ctx.arc(p.x + 4, p.y - p.h / 2 + 8, 2, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Legs
-  ctx.strokeStyle = '#3a6fff';
-  ctx.lineWidth = 5;
-  ctx.lineCap = 'round';
-  ctx.beginPath();
-  ctx.moveTo(p.x - 7, p.y + p.h / 2 - 16);
-  ctx.lineTo(p.x - 9, p.y + p.h / 2);
-  ctx.moveTo(p.x + 7, p.y + p.h / 2 - 16);
-  ctx.lineTo(p.x + 9, p.y + p.h / 2);
-  ctx.stroke();
-
-  // Arms
-  ctx.strokeStyle = '#3a6fff';
-  ctx.lineWidth = 4;
-  ctx.beginPath();
-  ctx.moveTo(p.x - p.w / 2, p.y - p.h / 2 + 22);
-  ctx.lineTo(p.x - p.w / 2 - 10, p.y - p.h / 2 + 34);
-  ctx.moveTo(p.x + p.w / 2, p.y - p.h / 2 + 22);
-  ctx.lineTo(p.x + p.w / 2 + 10, p.y - p.h / 2 + 34);
-  ctx.stroke();
-
-  ctx.restore();
+function drawBg() {
+  ctx.fillStyle = '#0d0d2b';
+  ctx.fillRect(0, 0, W, H);
+  ctx.strokeStyle = '#1a1f40';
+  ctx.lineWidth = 1;
+  for (let y = 0; y < H; y += 60) {
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+  }
+  ctx.strokeStyle = '#223';
+  ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(0, H - 16); ctx.lineTo(W, H - 16); ctx.stroke();
 }
 
-function drawObject(o) {
+function drawCharacter(p) {
+  if (invincible > 0 && Math.floor(invincible / 5) % 2 === 0) return;
+  ctx.font = `${p.w}px serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+
+  // glow
+  ctx.shadowColor = '#3a6fff';
+  ctx.shadowBlur  = 14;
+  ctx.fillText(selectedChar.emoji, p.x, p.y);
+  ctx.shadowBlur = 0;
+}
+
+function drawFalling(o) {
   ctx.font = `${o.w}px serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
+
+  if (o.type === 'collect') {
+    // golden glow for collectibles
+    const pulse = 0.5 + 0.5 * Math.sin(o.pulse);
+    ctx.shadowColor = '#ffd700';
+    ctx.shadowBlur  = 8 + pulse * 10;
+    o.pulse += 0.12;
+  } else {
+    ctx.shadowColor = '#ff3030';
+    ctx.shadowBlur  = 6;
+  }
+
   ctx.fillText(o.emoji, o.x, o.y);
+  ctx.shadowBlur = 0;
 }
 
-function drawBackground() {
-  ctx.fillStyle = '#0d0d2b';
-  ctx.fillRect(0, 0, W, H);
+function drawPopups() {
+  popups.forEach(p => {
+    ctx.globalAlpha = p.alpha;
+    ctx.fillStyle   = '#ffd700';
+    ctx.font        = `bold ${p.size}px sans-serif`;
+    ctx.textAlign   = 'center';
+    ctx.fillText(p.text, p.x, p.y);
+    ctx.globalAlpha = 1;
+  });
+}
 
-  // ground line
-  ctx.strokeStyle = '#223';
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(0, H - 20);
-  ctx.lineTo(W, H - 20);
-  ctx.stroke();
+function drawScoreBg() {
+  ctx.fillStyle = 'rgba(255,255,255,0.05)';
+  ctx.font = 'bold 90px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(score, W / 2, H / 2 - 20);
 }
 
 // ── Collision ─────────────────────────────────────────────────────────────────
 
-function rectsOverlap(ax, ay, aw, ah, bx, by, bw, bh) {
-  return ax - aw / 2 < bx + bw / 2
-      && ax + aw / 2 > bx - bw / 2
-      && ay - ah / 2 < by + bh / 2
-      && ay + ah / 2 > by - bh / 2;
+function overlap(ax, ay, ar, bx, by, br) {
+  const dx = ax - bx, dy = ay - by;
+  return Math.sqrt(dx * dx + dy * dy) < ar + br;
 }
 
-// ── Game loop ─────────────────────────────────────────────────────────────────
+// ── Update ────────────────────────────────────────────────────────────────────
 
 function update() {
-  // Player movement
+  // Move player
   let dx = 0;
   if (keys['ArrowLeft']  || keys['a'] || keys['A']) dx -= player.speed;
   if (keys['ArrowRight'] || keys['d'] || keys['D']) dx += player.speed;
   player.x = Math.max(player.w / 2, Math.min(W - player.w / 2, player.x + dx));
 
-  // Spawn objects
-  spawnTimer++;
-  if (spawnTimer >= spawnInterval) {
-    objects.push(spawnObject());
-    spawnTimer = 0;
+  // Spawn hazards
+  if (++hazardTimer >= hazardInterval) {
+    hazards.push(spawnHazard());
+    hazardTimer = 0;
   }
 
-  // Move objects
-  for (let i = objects.length - 1; i >= 0; i--) {
-    objects[i].y += objects[i].vy;
-    if (objects[i].y - objects[i].h / 2 > H) {
-      objects.splice(i, 1);
-      score++;
+  // Spawn collectibles
+  if (++collectTimer >= collectInterval) {
+    collectibles.push(spawnCollectible());
+    collectTimer = 0;
+  }
+
+  const pr = player.w * 0.38;
+
+  // Move & check hazards
+  if (invincible > 0) invincible--;
+  for (let i = hazards.length - 1; i >= 0; i--) {
+    hazards[i].y += hazards[i].vy;
+    if (hazards[i].y > H + 20) { hazards.splice(i, 1); score++; updateHUD(); continue; }
+    if (invincible === 0 && overlap(player.x, player.y, pr, hazards[i].x, hazards[i].y, hazards[i].w * 0.42)) {
+      lives--;
+      invincible = 90;
+      updateHUD();
+      if (lives <= 0) { gameOver(); return; }
+    }
+  }
+
+  // Move & check collectibles
+  for (let i = collectibles.length - 1; i >= 0; i--) {
+    collectibles[i].y += collectibles[i].vy;
+    if (collectibles[i].y > H + 20) { collectibles.splice(i, 1); continue; }
+    if (overlap(player.x, player.y, pr + 4, collectibles[i].x, collectibles[i].y, collectibles[i].w * 0.5)) {
+      const pts = collectibles[i].pts;
+      score += pts;
+      collectedCount++;
+      popups.push({ x: collectibles[i].x, y: collectibles[i].y, text: `+${pts}`, alpha: 1, size: 22 });
+      collectibles.splice(i, 1);
       updateHUD();
     }
   }
 
-  // Collision
-  if (invincible > 0) {
-    invincible--;
-  } else {
-    for (let o of objects) {
-      if (rectsOverlap(player.x, player.y, player.w * 0.7, player.h * 0.7,
-                       o.x, o.y, o.w * 0.8, o.h * 0.8)) {
-        lives--;
-        invincible = 90;
-        updateHUD();
-        if (lives <= 0) { gameOver(); return; }
-        break;
-      }
-    }
+  // Popups
+  for (let i = popups.length - 1; i >= 0; i--) {
+    popups[i].y    -= 1.2;
+    popups[i].alpha -= 0.022;
+    if (popups[i].alpha <= 0) popups.splice(i, 1);
   }
 
   // Difficulty ramp
-  const newLevel = 1 + Math.floor(score / 10);
+  const newLevel = 1 + Math.floor(score / 12);
   if (newLevel !== level) {
-    level = newLevel;
-    speed = 2.8 + (level - 1) * 0.5;
-    spawnInterval = Math.max(35, 90 - (level - 1) * 8);
+    level           = newLevel;
+    speed           = 2.6 + (level - 1) * 0.45;
+    hazardInterval  = Math.max(32, 85 - (level - 1) * 7);
+    collectInterval = Math.max(60, 140 - (level - 1) * 8);
     updateHUD();
   }
 }
 
 function draw() {
-  drawBackground();
-  objects.forEach(drawObject);
-  drawPlayer(player);
+  drawBg();
+  drawScoreBg();
+  collectibles.forEach(drawFalling);
+  hazards.forEach(drawFalling);
+  drawCharacter(player);
+  drawPopups();
 
-  // Score counter on canvas
-  ctx.fillStyle = 'rgba(255,255,255,0.08)';
-  ctx.font = 'bold 80px sans-serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(score, W / 2, H / 2);
+  // Legend bottom-left
+  ctx.globalAlpha = 0.55;
+  ctx.font = '11px sans-serif';
+  ctx.textAlign = 'left';
+  ctx.fillStyle = '#88f';
+  ctx.fillText('💣 = ausweichen   ⭐ = einsammeln', 10, H - 3);
+  ctx.globalAlpha = 1;
 }
 
-function loop(ts) {
+function loop() {
   if (!running) return;
   update();
   draw();
   raf = requestAnimationFrame(loop);
 }
 
-// ── Game over / start ─────────────────────────────────────────────────────────
+// ── Game over ─────────────────────────────────────────────────────────────────
 
 function gameOver() {
   running = false;
   cancelAnimationFrame(raf);
-
-  overlay.innerHTML = `
-    <h1>💀 Game Over</h1>
-    <div class="score-display">Punkte: ${score}</div>
-    <p>Level ${level} erreicht!<br>Kannst du mehr Objekte ausweichen?</p>
-    <button id="startBtn">Nochmal spielen</button>
-  `;
-  overlay.style.display = 'flex';
-  document.getElementById('startBtn').addEventListener('click', startGame);
+  document.getElementById('final-score').textContent =
+    `Punkte: ${score}  |  ⭐ ${collectedCount} gesammelt`;
+  document.getElementById('final-msg').textContent =
+    `Level ${level} erreicht als ${selectedChar.emoji} ${selectedChar.label}!`;
+  showScreen('gameover');
 }
 
-function startGame() {
-  overlay.style.display = 'none';
+// ── Navigation ────────────────────────────────────────────────────────────────
+
+document.getElementById('btn-to-char').addEventListener('click', () => showScreen('char'));
+
+document.getElementById('btn-start').addEventListener('click', () => {
+  showScreen(null);
   reset();
   running = true;
   raf = requestAnimationFrame(loop);
-}
+});
+
+document.getElementById('btn-replay').addEventListener('click', () => {
+  showScreen(null);
+  reset();
+  running = true;
+  raf = requestAnimationFrame(loop);
+});
+
+document.getElementById('btn-charselect').addEventListener('click', () => showScreen('char'));
 
 // ── Input ─────────────────────────────────────────────────────────────────────
 
 document.addEventListener('keydown', e => { keys[e.key] = true; });
 document.addEventListener('keyup',   e => { keys[e.key] = false; });
 
-// Touch controls
 let touchStartX = null;
-canvas.addEventListener('touchstart', e => {
-  touchStartX = e.touches[0].clientX;
-}, { passive: true });
-
+canvas.addEventListener('touchstart', e => { touchStartX = e.touches[0].clientX; }, { passive: true });
 canvas.addEventListener('touchmove', e => {
   if (touchStartX === null || !running) return;
   const dx = e.touches[0].clientX - touchStartX;
-  if (Math.abs(dx) > 5) {
-    player.x = Math.max(player.w / 2, Math.min(W - player.w / 2, player.x + dx * 0.4));
+  if (Math.abs(dx) > 4) {
+    player.x = Math.max(player.w / 2, Math.min(W - player.w / 2, player.x + dx * 0.45));
     touchStartX = e.touches[0].clientX;
   }
 }, { passive: true });
-
-// ── Boot ──────────────────────────────────────────────────────────────────────
-
-startBtn.addEventListener('click', startGame);
 </script>
 </body>
 </html>
