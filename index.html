@@ -158,25 +158,25 @@
 // ── Characters ────────────────────────────────────────────────────────────────
 
 const HUMANS = [
-  { emoji: '👨', label: 'Mann'    },
-  { emoji: '👩', label: 'Frau'    },
-  { emoji: '👦', label: 'Junge'   },
-  { emoji: '👧', label: 'Mädchen' },
-  { emoji: '🧙', label: 'Zauberer'},
-  { emoji: '🦸', label: 'Held'    },
-  { emoji: '🧜', label: 'Meerjungfrau' },
-  { emoji: '🤴', label: 'Prinz'   },
+  { emoji: '👨', label: 'Mann',         bodyColor: '#3a6fff' },
+  { emoji: '👩', label: 'Frau',         bodyColor: '#e040fb' },
+  { emoji: '👦', label: 'Junge',        bodyColor: '#00bcd4' },
+  { emoji: '👧', label: 'Mädchen',      bodyColor: '#f06292' },
+  { emoji: '🧙', label: 'Zauberer',     bodyColor: '#7c4dff' },
+  { emoji: '🦸', label: 'Held',         bodyColor: '#e53935' },
+  { emoji: '🧜', label: 'Nixe',         bodyColor: '#00897b' },
+  { emoji: '🤴', label: 'Prinz',        bodyColor: '#ffc107' },
 ];
 
 const ANIMALS = [
-  { emoji: '🐱', label: 'Katze'  },
-  { emoji: '🐶', label: 'Hund'   },
-  { emoji: '🐸', label: 'Frosch' },
-  { emoji: '🐰', label: 'Hase'   },
-  { emoji: '🦊', label: 'Fuchs'  },
-  { emoji: '🐼', label: 'Panda'  },
-  { emoji: '🐯', label: 'Tiger'  },
-  { emoji: '🦄', label: 'Einhorn'},
+  { emoji: '🐱', label: 'Katze',   bodyColor: '#ff8a65' },
+  { emoji: '🐶', label: 'Hund',    bodyColor: '#8d6e63' },
+  { emoji: '🐸', label: 'Frosch',  bodyColor: '#43a047' },
+  { emoji: '🐰', label: 'Hase',    bodyColor: '#f8bbd0' },
+  { emoji: '🦊', label: 'Fuchs',   bodyColor: '#ef6c00' },
+  { emoji: '🐼', label: 'Panda',   bodyColor: '#546e7a' },
+  { emoji: '🐯', label: 'Tiger',   bodyColor: '#f9a825' },
+  { emoji: '🦄', label: 'Einhorn', bodyColor: '#ce93d8' },
 ];
 
 // ── Canvas / DOM ──────────────────────────────────────────────────────────────
@@ -234,7 +234,7 @@ function selectChar(ch, card) {
 // ── Player ────────────────────────────────────────────────────────────────────
 
 function makePlayer() {
-  return { x: W / 2, y: H - 50, w: 44, h: 44, speed: 5.5 };
+  return { x: W / 2, y: H - 70, w: 56, h: 80, speed: 5.5, legAnim: 0 };
 }
 
 // ── Falling objects ───────────────────────────────────────────────────────────
@@ -316,15 +316,78 @@ function drawBg() {
 
 function drawCharacter(p) {
   if (invincible > 0 && Math.floor(invincible / 5) % 2 === 0) return;
-  ctx.font = `${p.w}px serif`;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
 
-  // glow
-  ctx.shadowColor = '#3a6fff';
-  ctx.shadowBlur  = 14;
-  ctx.fillText(selectedChar.emoji, p.x, p.y);
-  ctx.shadowBlur = 0;
+  const moving = keys['ArrowLeft'] || keys['a'] || keys['A'] ||
+                 keys['ArrowRight'] || keys['d'] || keys['D'];
+  if (moving) p.legAnim = (p.legAnim + 0.18) % (Math.PI * 2);
+
+  const headY  = p.y - p.h / 2 + 28;   // center of emoji head
+  const bodyY  = headY + 36;
+  const footY  = p.y + p.h / 2;
+  const legSwing = Math.sin(p.legAnim) * (moving ? 10 : 0);
+
+  ctx.save();
+
+  // ground shadow
+  ctx.fillStyle = 'rgba(0,0,0,0.35)';
+  ctx.beginPath();
+  ctx.ellipse(p.x, footY + 4, 22, 6, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // body (torso)
+  const bodyColor = selectedChar.bodyColor || '#3a6fff';
+  ctx.fillStyle = bodyColor;
+  ctx.beginPath();
+  ctx.roundRect(p.x - 14, bodyY - 2, 28, 26, 6);
+  ctx.fill();
+
+  // legs
+  ctx.strokeStyle = bodyColor;
+  ctx.lineWidth   = 7;
+  ctx.lineCap     = 'round';
+  ctx.beginPath();
+  // left leg
+  ctx.moveTo(p.x - 7, bodyY + 22);
+  ctx.lineTo(p.x - 7 + legSwing * 0.5,  footY);
+  // right leg
+  ctx.moveTo(p.x + 7, bodyY + 22);
+  ctx.lineTo(p.x + 7 - legSwing * 0.5,  footY);
+  ctx.stroke();
+
+  // feet
+  ctx.fillStyle = '#555';
+  ctx.beginPath();
+  ctx.ellipse(p.x - 7 + legSwing * 0.5, footY + 3, 7, 4, 0, 0, Math.PI * 2);
+  ctx.ellipse(p.x + 7 - legSwing * 0.5, footY + 3, 7, 4, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // arms
+  ctx.strokeStyle = bodyColor;
+  ctx.lineWidth   = 5;
+  ctx.beginPath();
+  ctx.moveTo(p.x - 14, bodyY + 4);
+  ctx.lineTo(p.x - 22, bodyY + 14 + legSwing * 0.4);
+  ctx.moveTo(p.x + 14, bodyY + 4);
+  ctx.lineTo(p.x + 22, bodyY + 14 - legSwing * 0.4);
+  ctx.stroke();
+
+  // emoji head (big, centered)
+  ctx.shadowColor = '#3a6fff88';
+  ctx.shadowBlur  = 16;
+  ctx.font        = '52px serif';
+  ctx.textAlign   = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(selectedChar.emoji, p.x, headY);
+  ctx.shadowBlur  = 0;
+
+  // name label below feet
+  ctx.fillStyle   = 'rgba(255,255,255,0.75)';
+  ctx.font        = 'bold 11px sans-serif';
+  ctx.textAlign   = 'center';
+  ctx.textBaseline = 'top';
+  ctx.fillText(selectedChar.label, p.x, footY + 10);
+
+  ctx.restore();
 }
 
 function drawFalling(o) {
@@ -394,7 +457,7 @@ function update() {
     collectTimer = 0;
   }
 
-  const pr = player.w * 0.38;
+  const pr = player.w * 0.30;   // hitbox nur um den Körper, nicht den ganzen Kopf
 
   // Move & check hazards
   if (invincible > 0) invincible--;
