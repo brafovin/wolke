@@ -397,63 +397,53 @@ function drawFalling(o) {
   ctx.translate(o.x, o.y);
 
   if (o.type === 'hazard') {
-    // Rotate hazards slowly
     o.angle = (o.angle || 0) + (o.rot || 0);
     ctx.rotate(o.angle);
 
-    // Red badge background
-    ctx.fillStyle = 'rgba(180, 20, 20, 0.75)';
+    // gleicher Hintergrund für alle
+    ctx.fillStyle = 'rgba(30, 30, 60, 0.80)';
     ctx.beginPath();
     ctx.arc(0, 0, o.w * 0.54, 0, Math.PI * 2);
     ctx.fill();
 
-    // Red border ring
-    ctx.strokeStyle = '#ff4444';
-    ctx.lineWidth = 3;
+    ctx.strokeStyle = 'rgba(200, 200, 255, 0.55)';
+    ctx.lineWidth = 2;
     ctx.beginPath();
     ctx.arc(0, 0, o.w * 0.54, 0, Math.PI * 2);
     ctx.stroke();
 
-    // Emoji
-    ctx.shadowColor = '#ff0000';
-    ctx.shadowBlur  = 12;
+    ctx.shadowBlur = 0;
     ctx.font = `${o.w * 0.72}px serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(o.emoji, 0, 0);
-    ctx.shadowBlur = 0;
 
     ctx.restore();
 
-    // Label underneath (outside rotation)
     ctx.save();
-    ctx.fillStyle = '#ff5555';
-    ctx.font = 'bold 11px sans-serif';
+    ctx.fillStyle = 'rgba(255,255,255,0.6)';
+    ctx.font = 'bold 10px sans-serif';
     ctx.textAlign = 'center';
     ctx.fillText('ACHTUNG!', o.x, o.y + o.w * 0.62);
     ctx.restore();
 
   } else {
-    // Pulsing gold background for collectibles
     o.pulse = (o.pulse || 0) + 0.1;
     const p = 0.5 + 0.5 * Math.sin(o.pulse);
 
-    // Gold badge background
-    ctx.fillStyle = `rgba(180, 140, 0, ${0.55 + p * 0.25})`;
+    // gleicher Hintergrund für alle
+    ctx.fillStyle = 'rgba(30, 30, 60, 0.80)';
     ctx.beginPath();
     ctx.arc(0, 0, o.w * 0.54, 0, Math.PI * 2);
     ctx.fill();
 
-    // Gold border ring
-    ctx.strokeStyle = `rgba(255, 220, 50, ${0.7 + p * 0.3})`;
-    ctx.lineWidth = 3;
+    ctx.strokeStyle = `rgba(200, 200, 255, ${0.4 + p * 0.35})`;
+    ctx.lineWidth = 2;
     ctx.beginPath();
     ctx.arc(0, 0, o.w * 0.54, 0, Math.PI * 2);
     ctx.stroke();
 
-    // Emoji
-    ctx.shadowColor = '#ffd700';
-    ctx.shadowBlur  = 10 + p * 14;
+    ctx.shadowBlur = 0;
     ctx.font = `${o.w * 0.72}px serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
@@ -464,8 +454,8 @@ function drawFalling(o) {
 
     // Points label underneath
     ctx.save();
-    ctx.fillStyle = '#ffd700';
-    ctx.font = 'bold 12px sans-serif';
+    ctx.fillStyle = 'rgba(255,255,255,0.6)';
+    ctx.font = 'bold 10px sans-serif';
     ctx.textAlign = 'center';
     ctx.fillText(`+${o.pts} Pkt`, o.x, o.y + o.w * 0.62);
     ctx.restore();
