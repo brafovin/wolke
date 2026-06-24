@@ -124,7 +124,8 @@
 <div id="screen-start" class="screen active">
   <h1>⚡ AUSWEICHEN ⚡</h1>
   <p>Weiche den Gefahren aus 💣🪨🔥<br>
-     und sammel die Bonusobjekte ein ⭐💎🍀</p>
+     Sammel Boni ein ⭐💎🍀 und Herzen ❤️ für Extra-Leben!<br>
+     <strong>← →</strong> bewegen &nbsp;|&nbsp; <strong>Leertaste / ↑</strong> springen</p>
   <button class="btn" id="btn-to-char">Charakter wählen →</button>
 </div>
 
@@ -198,8 +199,8 @@ function showScreen(name) {
 
 // ── State ─────────────────────────────────────────────────────────────────────
 
-let player, hazards, collectibles, score, collectedCount, lives, level;
-let speed, hazardTimer, hazardInterval, collectTimer, collectInterval;
+let player, hazards, collectibles, hearts, score, collectedCount, lives, level;
+let speed, hazardTimer, hazardInterval, collectTimer, collectInterval, heartTimer;
 let running = false, keys = {}, raf, invincible = 0;
 let selectedChar = HUMANS[0];
 let popups = [];   // floating "+X" text effects
@@ -233,8 +234,12 @@ function selectChar(ch, card) {
 
 // ── Player ────────────────────────────────────────────────────────────────────
 
+const GROUND_Y = H - 70;
+const GRAVITY  = 0.5;
+const JUMP_FORCE = -12;
+
 function makePlayer() {
-  return { x: W / 2, y: H - 70, w: 56, h: 80, speed: 5.5, legAnim: 0 };
+  return { x: W / 2, y: GROUND_Y, w: 56, h: 80, speed: 5.5, legAnim: 0, vy: 0, onGround: true };
 }
 
 // ── Falling objects ───────────────────────────────────────────────────────────
@@ -276,10 +281,24 @@ function spawnCollectible() {
 
 // ── Reset ─────────────────────────────────────────────────────────────────────
 
+function spawnHeart() {
+  const size = 32;
+  return {
+    x:   size / 2 + Math.random() * (W - size),
+    y:   -size - 20,
+    w:   size,
+    h:   size,
+    vy:  1.4 + Math.random() * 0.6,
+    pulse: 0,
+    type: 'heart',
+  };
+}
+
 function reset() {
   player          = makePlayer();
   hazards         = [];
   collectibles    = [];
+  hearts          = [];
   popups          = [];
   score           = 0;
   collectedCount  = 0;
@@ -290,6 +309,7 @@ function reset() {
   hazardInterval  = 85;
   collectTimer    = 0;
   collectInterval = 140;
+  heartTimer      = 0;
   invincible      = 0;
   updateHUD();
 }
@@ -462,10 +482,45 @@ function drawFalling(o) {
   }
 }
 
+function drawHeart(o) {
+  o.pulse = (o.pulse || 0) + 0.08;
+  const scale = 1 + 0.12 * Math.sin(o.pulse);
+
+  ctx.save();
+  ctx.translate(o.x, o.y);
+  ctx.scale(scale, scale);
+
+  // pink background circle
+  ctx.fillStyle = 'rgba(30, 30, 60, 0.80)';
+  ctx.beginPath();
+  ctx.arc(0, 0, o.w * 0.54, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.strokeStyle = `rgba(255, 100, 150, ${0.6 + 0.4 * Math.sin(o.pulse)})`;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(0, 0, o.w * 0.54, 0, Math.PI * 2);
+  ctx.stroke();
+
+  ctx.font = `${o.w * 0.72}px serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('❤️', 0, 0);
+
+  ctx.restore();
+
+  ctx.save();
+  ctx.fillStyle = 'rgba(255,150,180,0.8)';
+  ctx.font = 'bold 10px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('+1 Leben', o.x, o.y + o.w * 0.62);
+  ctx.restore();
+}
+
 function drawPopups() {
   popups.forEach(p => {
     ctx.globalAlpha = p.alpha;
-    ctx.fillStyle   = '#ffd700';
+    ctx.fillStyle   = p.color || '#ffd700';
     ctx.font        = `bold ${p.size}px sans-serif`;
     ctx.textAlign   = 'center';
     ctx.fillText(p.text, p.x, p.y);
@@ -497,6 +552,19 @@ function update() {
   if (keys['ArrowRight'] || keys['d'] || keys['D']) dx += player.speed;
   player.x = Math.max(player.w / 2, Math.min(W - player.w / 2, player.x + dx));
 
+  // Jump
+  if ((keys[' '] || keys['ArrowUp'] || keys['w'] || keys['W']) && player.onGround) {
+    player.vy = JUMP_FORCE;
+    player.onGround = false;
+  }
+  player.vy += GRAVITY;
+  player.y  += player.vy;
+  if (player.y >= GROUND_Y) {
+    player.y = GROUND_Y;
+    player.vy = 0;
+    player.onGround = true;
+  }
+
   // Spawn hazards
   if (++hazardTimer >= hazardInterval) {
     hazards.push(spawnHazard());
@@ -507,6 +575,14 @@ function update() {
   if (++collectTimer >= collectInterval) {
     collectibles.push(spawnCollectible());
     collectTimer = 0;
+  }
+
+  // Spawn hearts (alle 600 frames, seltener wenn viele Leben)
+  heartTimer++;
+  const heartInterval = lives >= 5 ? 9999 : 500 + Math.random() * 200;
+  if (heartTimer >= heartInterval) {
+    hearts.push(spawnHeart());
+    heartTimer = 0;
   }
 
   const pr = player.w * 0.30;   // hitbox nur um den Körper, nicht den ganzen Kopf
@@ -538,6 +614,18 @@ function update() {
     }
   }
 
+  // Move & check hearts
+  for (let i = hearts.length - 1; i >= 0; i--) {
+    hearts[i].y += hearts[i].vy;
+    if (hearts[i].y > H + 20) { hearts.splice(i, 1); continue; }
+    if (overlap(player.x, player.y, pr + 6, hearts[i].x, hearts[i].y, hearts[i].w * 0.5)) {
+      lives = Math.min(lives + 1, 5);
+      popups.push({ x: hearts[i].x, y: hearts[i].y, text: '+❤️', alpha: 1, size: 22, color: '#ff6b8a' });
+      hearts.splice(i, 1);
+      updateHUD();
+    }
+  }
+
   // Popups
   for (let i = popups.length - 1; i >= 0; i--) {
     popups[i].y    -= 1.2;
@@ -561,6 +649,7 @@ function draw() {
   drawScoreBg();
   collectibles.forEach(drawFalling);
   hazards.forEach(drawFalling);
+  hearts.forEach(drawHeart);
   drawCharacter(player);
   drawPopups();
 
@@ -569,7 +658,7 @@ function draw() {
   ctx.font = '11px sans-serif';
   ctx.textAlign = 'left';
   ctx.fillStyle = '#88f';
-  ctx.fillText('💣 = ausweichen   ⭐ = einsammeln', 10, H - 3);
+  ctx.fillText('💣 ausweichen  ⭐ einsammeln  ❤️ Leben', 10, H - 3);
   ctx.globalAlpha = 1;
 }
 
@@ -618,13 +707,24 @@ document.addEventListener('keydown', e => { keys[e.key] = true; });
 document.addEventListener('keyup',   e => { keys[e.key] = false; });
 
 let touchStartX = null;
-canvas.addEventListener('touchstart', e => { touchStartX = e.touches[0].clientX; }, { passive: true });
+let touchStartY = null;
+canvas.addEventListener('touchstart', e => {
+  touchStartX = e.touches[0].clientX;
+  touchStartY = e.touches[0].clientY;
+}, { passive: true });
 canvas.addEventListener('touchmove', e => {
   if (touchStartX === null || !running) return;
   const dx = e.touches[0].clientX - touchStartX;
+  const dy = e.touches[0].clientY - touchStartY;
   if (Math.abs(dx) > 4) {
     player.x = Math.max(player.w / 2, Math.min(W - player.w / 2, player.x + dx * 0.45));
     touchStartX = e.touches[0].clientX;
+  }
+  // Wischen nach oben = springen
+  if (dy < -20 && player.onGround) {
+    player.vy = JUMP_FORCE;
+    player.onGround = false;
+    touchStartY = e.touches[0].clientY;
   }
 }, { passive: true });
 </script>
